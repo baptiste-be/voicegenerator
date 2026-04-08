@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voice GeneratorFR</title>
+    <style>
+        :root {
+            --primary: #6366f1;
+            --primary-hover: #4f46e5;
+            --bg: #0f172a;
+            --surface: #1e293b;
+            --text: #f8fafc;
+            --danger: #ef4444;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+        .container {
+            background-color: var(--surface);
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+            max-width: 500px;
+            width: 100%;
+            text-align: center;
+        }
+        .page {
+            display: none;
+        }
+        .page.active {
+            display: block;
+            animation: fadeIn 0.3s ease;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        h1 {
+            color: var(--primary);
+            margin-bottom: 20px;
+        }
+        .phrases-box {
+            background-color: rgba(255, 255, 255, 0.05);
+            padding: 15px;
+            border-left: 4px solid var(--primary);
+            margin: 20px 0;
+            text-align: left;
+            font-style: italic;
+        }
+        button {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background 0.2s;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: var(--primary-hover);
+        }
+        button:disabled {
+            background-color: #475569;
+            cursor: not-allowed;
+        }
+        button.stop-btn {
+            background-color: var(--danger);
+        }
+        button.stop-btn:hover:not(:disabled) {
+            background-color: #dc2626;
+        }
+        #status {
+            margin-top: 15px;
+            font-size: 14px;
+            color: #94a3b8;
+        }
+        audio {
+            width: 100%;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div id="page1" class="page active">
+            <h1>Voice GeneratorFR</h1>
+            <p>Pour générer votre empreinte vocale, veuillez lire les phrases suivantes à voix haute :</p>
+            
+            <div class="phrases-box">
+                <p>"Bonjour, je configure ma voix sur Voice GeneratorFR."</p>
+                <p>"La technologie permet aujourd'hui de cloner et synthétiser la parole."</p>
+            </div>
+
+            <button id="startBtn">🎤 Commencer l'enregistrement</button>
+            <button id="stopBtn" class="stop-btn" disabled>⏹️ Arrêter et Sauvegarder</button>
+            
+            <p id="status"></p>
+        </div>
+
+        <div id="page2" class="page">
+            <h1>Profil Vocal Actif</h1>
+            <p>Votre voix a été enregistrée avec succès dans le stockage local de votre navigateur.</p>
+            
+            <audio id="audioPlayback" controls></audio>
+            
+            <div style="margin-top: 20px;">
+                <p style="font-size: 12px; color: #64748b; margin-bottom: 15px;">
+                    *Empreinte sauvegardée en LocalStorage. Le moteur de synthèse vocale (TTS) utilisera cette base.*
+                </p>
+                <button id="resetBtn">🔄 Refaire l'enregistrement</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let mediaRecorder;
+        let audioChunks = [];
+
+        // Éléments du DOM
+        const startBtn = document.getElementById('startBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const status = document.getElementById('status');
+        const page1 = document.getElementById('page1');
+        const page2 = document.getElementById('page2');
+        const audioPlayback = document.getElementById('audioPlayback');
+        const resetBtn = document.getElementById('resetBtn');
+
+        // Vérification au chargement : y a-t-il déjà une voix dans le localStorage ?
+        window.onload = () => {
+            const savedVoice = localStorage.getItem('voiceGeneratorFR_data');
+            if (savedVoice) {
+                afficherPage2(savedVoice);
+            }
+        };
+
+        // Lancer l'enregistrement
+        startBtn.onclick = async () => {
+            try {
+                // Demander l'accès au micro
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                mediaRecorder.start();
+                audioChunks = [];
+
+                mediaRecorder.addEventListener("dataavailable", event => {
+                    audioChunks.push(event.data);
+                });
+
+                mediaRecorder.addEventListener("stop", () => {
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                    
+                    // Convertir le Blob en Base64 pour le sauvegarder dans le LocalStorage
+                    const reader = new FileReader();
+                    reader.readAsDataURL(audioBlob);
+                    reader.onloadend = () => {
+                        const base64Audio = reader.result;
+                        try {
+                            localStorage.setItem('voiceGeneratorFR_data', base64Audio);
+                            afficherPage2(base64Audio);
+                            // Arrêter les flux du micro pour libérer la ressource
+                            stream.getTracks().forEach(track => track.stop());
+                        } catch (e) {
+                            status.textContent = "Erreur : L'enregistrement est trop long pour le stockage local.";
+                        }
+                    }
+                });
+
+                startBtn.disabled = true;
+                stopBtn.disabled = false;
+                status.textContent = "🔴 Enregistrement en cours... Lisez les phrases.";
+                status.style.color = "#ef4444";
+
+            } catch (err) {
+                status.textContent = "Erreur : Impossible d'accéder au microphone.";
+                status.style.color = "#ef4444";
+            }
+        };
+
+        // Arrêter l'enregistrement
+        stopBtn.onclick = () => {
+            mediaRecorder.stop();
+            startBtn.disabled = false;
+            stopBtn.disabled = true;
+            status.textContent = "Traitement et sauvegarde en cours...";
+            status.style.color = "#94a3b8";
+        };
+
+        // Effacer et recommencer
+        resetBtn.onclick = () => {
+            localStorage.removeItem('voiceGeneratorFR_data');
+            audioPlayback.src = "";
+            page2.classList.remove('active');
+            page1.classList.add('active');
+            status.textContent = "";
+        };
+
+        // Gérer l'affichage de la page 2
+        function afficherPage2(audioSource) {
+            page1.classList.remove('active');
+            page2.classList.add('active');
+            audioPlayback.src = audioSource;
+        }
+    </script>
+</body>
+</html>
