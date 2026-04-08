@@ -2,121 +2,32 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>Voice GeneratorFR - AI Local</title>
-    <script src="https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.1"></script>
-    <style>
-        :root { --p: #6366f1; --bg: #0f172a; --s: #1e293b; --t: #f8fafc; }
-        body { background: var(--bg); color: var(--t); font-family: sans-serif; display: flex; justify-content: center; padding: 20px; }
-        .card { background: var(--s); padding: 30px; border-radius: 15px; width: 100%; max-width: 600px; text-align: center; }
-        .hidden { display: none; }
-        textarea { width: 100%; height: 100px; margin: 10px 0; border-radius: 8px; padding: 10px; background: #0f172a; color: white; border: 1px solid #444; }
-        button { background: var(--p); border: none; color: white; padding: 12px 20px; border-radius: 8px; cursor: pointer; font-weight: bold; margin: 5px; }
-        button:disabled { background: #444; }
-        .loader { color: #facc15; font-size: 0.9em; margin: 10px 0; }
-    </style>
+    <title>Voice GeneratorFR - Entraînement</title>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
-
-<div class="card">
-    <h1>Voice GeneratorFR 🤖</h1>
-    
-    <div id="step1">
-        <p>Enregistrez 5 secondes de votre voix :</p>
-        <button id="recBtn">🎤 Enregistrer</button>
-        <button id="stopBtn" disabled style="background:#ef4444">⏹️ Stop</button>
-        <p id="recStatus"></p>
-    </div>
-
-    <div id="step2" class="hidden">
-        <p>✅ Voix enregistrée en local.</p>
-        <div class="loader" id="modelStatus">Chargement de l'IA (WASM)...</div>
-        <textarea id="inputText" placeholder="Tapez le texte que votre voix doit dire..."></textarea>
-        <br>
-        <button id="genBtn" disabled>🔊 Générer avec MA VOIX</button>
-        <hr>
-        <div id="result">
-            <p>Résultat :</p>
-            <audio id="outputAudio" controls></audio>
+    <div class="container">
+        <h1>Entraînement de l'IA</h1>
+        
+        <div id="text-container">
+            <p id="target-text">
+                <span class="word">Le</span> <span class="word">système</span> <span class="word">analyse</span> 
+                <span class="word">mon</span> <span class="word">intonation</span> <span class="word">pour</span> 
+                <span class="word">recréer</span> <span class="word">mon</span> <span class="word">empreinte</span> 
+                <span class="word">vocale.</span> <span class="word">Chaque</span> <span class="word">mot</span> 
+                <span class="word">prononcé</span> <span class="word">aide</span> <span class="word">le</span> 
+                <span class="word">modèle</span> <span class="word">à</span> <span class="word">devenir</span> 
+                <span class="word">plus</span> <span class="word">précis.</span>
+            </p>
         </div>
-        <br>
-        <button onclick="location.reload()" style="background:#444">🔄 Recommencer</button>
+
+        <div class="controls">
+            <button id="startBtn">🎤 Commencer la lecture</button>
+            <button id="stopBtn" disabled>💾 Sauvegarder l'empreinte</button>
+        </div>
+
+        <div id="status">En attente...</div>
     </div>
-</div>
-
-<script type="module">
-    // Importation du moteur de synthèse
-    import { pipeline } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.1';
-
-    let synthesizer;
-    let userVoiceBlob;
-    let mediaRecorder;
-    let chunks = [];
-
-    // 1. Chargement du modèle ultra-compressé (Xenova/speecht5_tts)
-    async function loadModel() {
-        try {
-            synthesizer = await pipeline('text-to-speech', 'Xenova/speecht5_tts', {
-                quantized: true // Version ultra compressée
-            });
-            document.getElementById('modelStatus').textContent = "🚀 IA prête (Mode Local)";
-            document.getElementById('genBtn').disabled = false;
-        } catch (e) {
-            document.getElementById('modelStatus').textContent = "Erreur de chargement du modèle.";
-        }
-    }
-
-    // 2. Gestion de l'enregistrement
-    const recBtn = document.getElementById('recBtn');
-    const stopBtn = document.getElementById('stopBtn');
-
-    recBtn.onclick = async () => {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        mediaRecorder = new MediaRecorder(stream);
-        mediaRecorder.start();
-        chunks = [];
-        recBtn.disabled = true;
-        stopBtn.disabled = false;
-        document.getElementById('recStatus').textContent = "Enregistrement en cours...";
-
-        mediaRecorder.ondataavailable = e => chunks.push(e.data);
-        mediaRecorder.onstop = () => {
-            userVoiceBlob = new Blob(chunks, { type: 'audio/wav' });
-            // Sauvegarde LocalStorage (Base64)
-            const reader = new FileReader();
-            reader.readAsDataURL(userVoiceBlob);
-            reader.onloadend = () => {
-                localStorage.setItem('myVoice', reader.result);
-                document.getElementById('step1').classList.add('hidden');
-                document.getElementById('step2').classList.remove('active', 'hidden');
-                loadModel();
-            };
-        };
-    };
-
-    stopBtn.onclick = () => mediaRecorder.stop();
-
-    // 3. GÉNÉRATION (Le clonage)
-    document.getElementById('genBtn').onclick = async () => {
-        const text = document.getElementById('inputText').value;
-        if (!text) return alert("Ecris un texte !");
-        
-        document.getElementById('modelStatus').textContent = "Génération en cours (cela peut prendre 10-30s selon ton PC)...";
-        
-        // Utilisation du modèle pour générer l'audio
-        // On passe le texte et on utilise l'échantillon enregistré pour le timbre
-        const speaker_embeddings = localStorage.getItem('myVoice'); // En vrai, il faudrait traiter l'audio en embeddings ici
-        
-        const output = await synthesizer(text, {
-            speaker_embeddings: 'https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/speaker_embeddings.bin' 
-            // NOTE : Dans un navigateur pur, calculer les embeddings de TA voix demande une étape de 
-            // "Voice Feature Extraction" (aussi disponible dans Transformers.js via SpeechFeatureExtractor)
-        });
-
-        const blob = new Blob([output.audio], { type: 'audio/wav' });
-        document.getElementById('outputAudio').src = URL.createObjectURL(blob);
-        document.getElementById('modelStatus').textContent = "✅ Terminé !";
-    };
-
-</script>
+    <script src="script.js"></script>
 </body>
 </html>
